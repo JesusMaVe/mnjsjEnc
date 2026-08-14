@@ -1,3 +1,4 @@
+// Package crypto provides Fernet encryption and RSA-PSS signing.
 package crypto
 
 import (

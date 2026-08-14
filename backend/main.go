@@ -72,13 +72,13 @@ func main() {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"token": token, "room": roomName})
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": token, "room": roomName})
 	})))
 
 	http.HandleFunc("/ws", wsHandler.HandleWebSocket)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	http.HandleFunc("/messages/", cors(limiter.Middleware(func(w http.ResponseWriter, r *http.Request) {

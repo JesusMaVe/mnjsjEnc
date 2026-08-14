@@ -1,3 +1,4 @@
+// Package handlers implements HTTP and WebSocket request handlers.
 package handlers
 
 import (
@@ -25,7 +26,7 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request, roo
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(messages)
+	_ = json.NewEncoder(w).Encode(messages)
 }
 
 // Decrypt descifra un ciphertext via CIA API (proxy seguro)
@@ -47,10 +48,10 @@ func (h *MessageHandler) Decrypt(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid ciphertext"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid ciphertext"})
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": plaintext})
+	_ = json.NewEncoder(w).Encode(map[string]string{"message": plaintext})
 }

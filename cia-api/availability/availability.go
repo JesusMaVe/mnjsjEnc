@@ -1,3 +1,4 @@
+// Package availability simulates a multi-node cluster health status.
 package availability
 
 import (
@@ -67,7 +68,7 @@ func (c *Cluster) ActiveNode() (int, bool) {
 
 func (c *Cluster) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"nodes": c.Status(),
 	})
 }
@@ -76,14 +77,14 @@ func (c *Cluster) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	idx, ok := c.ActiveNode()
 	if !ok {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "all nodes down"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "all nodes down"})
 		return
 	}
 	c.mu.RLock()
 	node := c.nodes[idx]
 	c.mu.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"node":   node.ID,
 		"status": "ok",
 	})

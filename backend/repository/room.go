@@ -1,3 +1,4 @@
+// Package repository provides data access for rooms and messages.
 package repository
 
 import (

@@ -1,3 +1,4 @@
+// Package services wraps external API calls to the CIA crypto service.
 package services
 
 import (

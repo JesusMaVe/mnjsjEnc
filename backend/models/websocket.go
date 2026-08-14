@@ -1,3 +1,4 @@
+// Package models defines the domain types for SecureMessage.
 package models
 
 type WebSocketMessage struct {

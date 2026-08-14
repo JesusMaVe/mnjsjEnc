@@ -1,3 +1,4 @@
+// Package handlers implements HTTP and WebSocket request handlers.
 package handlers
 
 import (
@@ -81,7 +82,7 @@ func (hub *Hub) run() {
 	}
 }
 
-func (h *WebSocketHandler) sendJSON(c *Client, v interface{}) {
+func (h *WebSocketHandler) sendJSON(c *Client, v any) {
 	data, _ := json.Marshal(v)
 	select {
 	case c.Send <- data:
@@ -89,7 +90,7 @@ func (h *WebSocketHandler) sendJSON(c *Client, v interface{}) {
 	}
 }
 
-func (h *WebSocketHandler) broadcastToRoom(roomID string, v interface{}) {
+func (h *WebSocketHandler) broadcastToRoom(roomID string, v any) {
 	data, _ := json.Marshal(v)
 	h.hub.mu.RLock()
 	defer h.hub.mu.RUnlock()
@@ -192,7 +193,7 @@ func (h *WebSocketHandler) handleJoin(c *Client, msg *models.WebSocketMessage) {
 	log.Printf("%s joined room %s", msg.Username, room.Name)
 }
 
-// handleMessageContent: cifra y firma el mensaje usando la CIA API
+// handleMessageContent encrypts and signs the message using the CIA API.
 func (h *WebSocketHandler) handleMessageContent(c *Client, msg *models.WebSocketMessage) {
 	if c.RoomID == "" {
 		h.sendError(c, "Must join a room first")
@@ -233,7 +234,7 @@ func (h *WebSocketHandler) handleMessageContent(c *Client, msg *models.WebSocket
 	})
 }
 
-// handleValidate: verifica la firma contra el ciphertext usando la CIA API
+// handleValidate verifies the signature against the ciphertext using the CIA API.
 func (h *WebSocketHandler) handleValidate(c *Client, msg *models.WebSocketMessage) {
 	message, integrity, err := h.messageRepo.GetMessageByID(msg.MessageID)
 	if err != nil {

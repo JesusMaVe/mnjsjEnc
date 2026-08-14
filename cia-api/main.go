@@ -70,10 +70,10 @@ func rateLimited(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func respond(w http.ResponseWriter, status int, v interface{}) {
+func respond(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func handleEncrypt(w http.ResponseWriter, r *http.Request) {

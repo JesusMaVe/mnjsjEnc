@@ -71,21 +71,30 @@ npm run dev
 ## Flujo de Criptografia
 
 1. **Cifrado**: Frontend envia texto plano → Backend cifra via CIA API (Fernet/AES-CBC+HMAC)
-2. **Firma**: Backend firma el ciphertext via CIA API (RSA-SHA256)
+2. **Firma**: Backend firma el ciphertext via CIA API (RSA-PSS)
 3. **Almacenamiento**: Solo ciphertext + firma se guardan en PostgreSQL
-4. **Verificacion**: Backend verifica firma contra ciphertext via CIA API
+4. **Descifrado**: Frontend solicita descifrado via Backend → CIA API
+5. **Verificacion**: Backend verifica firma contra ciphertext via CIA API
 
 ## Seguridad
 
-Este proyecto es un **demo academico**. Antes de usar en produccion, revisar:
+Implementada en 15 issues cerradas:
 
-- [ ] Autenticacion de usuarios (actualmente sin auth)
-- [ ] Credenciales de base de datos (actualmente hardcodeadas)
-- [ ] TLS en todas las conexiones
-- [ ] Rotacion de llaves criptograficas
-- [ ] Rate limiting
+- **Validacion de input** — Regex para usernames y nombres de sala (`middleware/validation.go`)
+- **Autenticacion por sala** — Token unico por sala, requerido para unirse al WebSocket (`middleware/auth.go`)
+- **CORS restringido** — Solo `localhost:3000` puede hacer peticiones
+- **WebSocket `CheckOrigin`** — Valida el origen en upgrades
+- **Rate limiting** — 100 req/min backend, 50 req/min CIA API por IP
+- **Text plano eliminado** — Solo ciphertext + firma se guardan en PostgreSQL
+- **Errores sanitizados** — No se expone informacion del sistema
+- **Puerto DB en localhost** — No accesible desde la red
+- **Docker healthcheck** — Verifica que PostgreSQL este activo
+- **Resource limits** — CPU y memoria acotados en containers
+- **Graceful shutdown** — Conexiones WebSocket se cierran limpiamente
+- **SSL configurable** — `DB_SSLMODE` para conexiones seguras a PostgreSQL
+- **Keyring con rotacion** — Fernet mantiene llave actual + anterior
 
-Ver plan completo de remediacion: `docs/superpowers/plans/2026-08-13-security-remediation.md`
+Ver plan completo: `docs/superpowers/plans/2026-08-13-security-remediation.md`
 
 ## Estructura del Proyecto
 
@@ -95,6 +104,7 @@ Ver plan completo de remediacion: `docs/superpowers/plans/2026-08-13-security-re
 │   ├── config/           # Configuracion via env vars
 │   ├── database/         # Conexion PostgreSQL
 │   ├── handlers/         # HTTP y WebSocket handlers
+│   ├── middleware/        # Auth, validacion, rate limiting
 │   ├── migrations/       # SQL migrations
 │   ├── models/           # Structs de dominio
 │   ├── repository/       # Capa de acceso a datos

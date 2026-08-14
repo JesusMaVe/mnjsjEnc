@@ -1,3 +1,4 @@
+// Package database provides PostgreSQL connectivity and connection pooling.
 package database
 
 import (
