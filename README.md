@@ -151,6 +151,3 @@ cd cia-api && go build -o cia-api .
 cd frontend && npm run build
 ```
 
-## Licencia
-
-Proyecto academico — consultar al autor.
