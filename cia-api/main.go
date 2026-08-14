@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"securemessage-cia/availability"
 	"securemessage-cia/crypto"
 	"sync"
@@ -180,8 +181,18 @@ func main() {
 	http.HandleFunc("/availability/request", cors(cluster.HandleRequest))
 	http.HandleFunc("/", cors(handleRoot))
 
-	log.Println("CIA API running on :8000")
-	if err := http.ListenAndServe(":8000", nil); err != nil {
-		log.Fatal(err)
+	certFile := os.Getenv("TLS_CERT")
+	keyFile := os.Getenv("TLS_KEY")
+
+	if certFile != "" && keyFile != "" {
+		log.Println("CIA API running on :8000 (TLS)")
+		if err := http.ListenAndServeTLS(":8000", certFile, keyFile, nil); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Println("CIA API running on :8000 (no TLS — set TLS_CERT/TLS_KEY for production)")
+		if err := http.ListenAndServe(":8000", nil); err != nil {
+			log.Fatal(err)
+		}
 	}
 }

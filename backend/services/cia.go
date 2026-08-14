@@ -2,26 +2,37 @@ package services
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
-const ciaAPIBase = "http://127.0.0.1:8000"
+func getCIAAPIBase() string {
+	if v := os.Getenv("CIA_API_BASE_URL"); v != "" {
+		return v
+	}
+	return "http://127.0.0.1:8000"
+}
 
 type CIAService struct {
 	client *http.Client
 }
 
 func NewCIAService() *CIAService {
-	return &CIAService{client: &http.Client{}}
+	// For self-signed certs in dev, skip verification
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // dev only
+	}
+	return &CIAService{client: &http.Client{Transport: tr}}
 }
 
 // Encrypt llama a POST /confidentiality/encrypt
 func (s *CIAService) Encrypt(message string) (string, error) {
 	body, _ := json.Marshal(map[string]string{"message": message})
-	resp, err := s.client.Post(ciaAPIBase+"/confidentiality/encrypt", "application/json", bytes.NewReader(body))
+	resp, err := s.client.Post(getCIAAPIBase()+"/confidentiality/encrypt", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("encrypt request failed: %w", err)
 	}
@@ -39,7 +50,7 @@ func (s *CIAService) Encrypt(message string) (string, error) {
 // Decrypt llama a POST /confidentiality/decrypt
 func (s *CIAService) Decrypt(ciphertext string) (string, error) {
 	body, _ := json.Marshal(map[string]string{"ciphertext": ciphertext})
-	resp, err := s.client.Post(ciaAPIBase+"/confidentiality/decrypt", "application/json", bytes.NewReader(body))
+	resp, err := s.client.Post(getCIAAPIBase()+"/confidentiality/decrypt", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("decrypt request failed: %w", err)
 	}
@@ -61,7 +72,7 @@ func (s *CIAService) Decrypt(ciphertext string) (string, error) {
 // Sign llama a POST /integrity/sign
 func (s *CIAService) Sign(message string) (string, error) {
 	body, _ := json.Marshal(map[string]string{"message": message})
-	resp, err := s.client.Post(ciaAPIBase+"/integrity/sign", "application/json", bytes.NewReader(body))
+	resp, err := s.client.Post(getCIAAPIBase()+"/integrity/sign", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("sign request failed: %w", err)
 	}
@@ -79,7 +90,7 @@ func (s *CIAService) Sign(message string) (string, error) {
 // Verify llama a POST /integrity/verify
 func (s *CIAService) Verify(message, signature string) (bool, error) {
 	body, _ := json.Marshal(map[string]string{"message": message, "signature": signature})
-	resp, err := s.client.Post(ciaAPIBase+"/integrity/verify", "application/json", bytes.NewReader(body))
+	resp, err := s.client.Post(getCIAAPIBase()+"/integrity/verify", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return false, fmt.Errorf("verify request failed: %w", err)
 	}
@@ -94,9 +105,9 @@ func (s *CIAService) Verify(message, signature string) (bool, error) {
 	return result.Valid, nil
 }
 
-// HealthCheck verifica que la CIA API esté disponible
+// HealthCheck verifica que la CIA API este disponible
 func (s *CIAService) HealthCheck() error {
-	resp, err := s.client.Get(ciaAPIBase + "/")
+	resp, err := s.client.Get(getCIAAPIBase() + "/")
 	if err != nil {
 		return fmt.Errorf("CIA API unreachable: %w", err)
 	}
