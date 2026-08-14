@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -38,14 +39,35 @@ func main() {
 	roomRepo := repository.NewRoomRepository(db)
 	messageRepo := repository.NewMessageRepository(db)
 	ciaService := services.NewCIAService()
+	tokenStore := middleware.NewTokenStore()
 
 	if err := ciaService.HealthCheck(); err != nil {
 		log.Printf("WARNING: CIA API not reachable at http://127.0.0.1:8000 - %v", err)
 		log.Printf("Make sure to start it: cd cia-api && go run main.go")
 	}
 
-	wsHandler := handlers.NewWebSocketHandler(roomRepo, messageRepo, ciaService)
+	wsHandler := handlers.NewWebSocketHandler(roomRepo, messageRepo, ciaService, tokenStore)
 	msgHandler := handlers.NewMessageHandler(messageRepo, ciaService)
+
+	// Token endpoint — generates a room access token
+	http.HandleFunc("/token", cors(func(w http.ResponseWriter, r *http.Request) {
+		roomName := r.URL.Query().Get("room")
+		if roomName == "" {
+			http.Error(w, "room parameter required", http.StatusBadRequest)
+			return
+		}
+		if err := middleware.ValidateRoomName(roomName); err != nil {
+			http.Error(w, "invalid room name", http.StatusBadRequest)
+			return
+		}
+		token, err := tokenStore.GenerateToken(roomName)
+		if err != nil {
+			http.Error(w, "failed to generate token", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"token": token, "room": roomName})
+	}))
 
 	http.HandleFunc("/ws", wsHandler.HandleWebSocket)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

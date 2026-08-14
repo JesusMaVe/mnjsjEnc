@@ -43,16 +43,17 @@ type WebSocketHandler struct {
 	roomRepo      *repository.RoomRepository
 	messageRepo   *repository.MessageRepository
 	ciaService    *services.CIAService
+	tokenStore    *middleware.TokenStore
 }
 
-func NewWebSocketHandler(roomRepo *repository.RoomRepository, messageRepo *repository.MessageRepository, ciaService *services.CIAService) *WebSocketHandler {
+func NewWebSocketHandler(roomRepo *repository.RoomRepository, messageRepo *repository.MessageRepository, ciaService *services.CIAService, tokenStore *middleware.TokenStore) *WebSocketHandler {
 	hub := &Hub{
 		clients:    make(map[*Client]bool),
 		rooms:      make(map[string]map[*Client]bool),
 		register:   make(chan *Client, 16),
 		unregister: make(chan *Client, 16),
 	}
-	h := &WebSocketHandler{hub: hub, roomRepo: roomRepo, messageRepo: messageRepo, ciaService: ciaService}
+	h := &WebSocketHandler{hub: hub, roomRepo: roomRepo, messageRepo: messageRepo, ciaService: ciaService, tokenStore: tokenStore}
 	go hub.run()
 	return h
 }
@@ -164,6 +165,10 @@ func (h *WebSocketHandler) handleJoin(c *Client, msg *models.WebSocketMessage) {
 	}
 	if err := middleware.ValidateRoomName(msg.RoomID); err != nil {
 		h.sendError(c, "Invalid room name")
+		return
+	}
+	if !h.tokenStore.ValidateToken(msg.Token, msg.RoomID) {
+		h.sendError(c, "Invalid or missing room token")
 		return
 	}
 

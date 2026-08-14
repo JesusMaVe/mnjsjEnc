@@ -8,8 +8,10 @@ export function useWebSocket() {
   const pendingMessages = []
   let reconnectAttempts = 0
   let reconnectTimer = null
+  let connectOptions = null
 
-  function connect() {
+  function connect(options) {
+    connectOptions = options
     connectionStatus.value = 'connecting'
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
@@ -19,6 +21,13 @@ export function useWebSocket() {
       connected.value = true
       connectionStatus.value = 'connected'
       reconnectAttempts = 0
+      // Send join with token
+      send({
+        type: 'join',
+        username: connectOptions.username,
+        roomId: connectOptions.roomId,
+        token: connectOptions.token
+      })
       while (pendingMessages.length > 0) {
         ws.value.send(JSON.stringify(pendingMessages.shift()))
       }
@@ -46,7 +55,7 @@ export function useWebSocket() {
   }
 
   function scheduleReconnect() {
-    if (reconnectAttempts >= 5) {
+    if (reconnectAttempts >= 5 || !connectOptions) {
       connectionStatus.value = 'failed'
       return
     }
@@ -54,7 +63,7 @@ export function useWebSocket() {
     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000)
     reconnectTimer = setTimeout(() => {
       reconnectAttempts++
-      connect()
+      connect(connectOptions)
     }, delay)
   }
 
@@ -85,7 +94,5 @@ export function useWebSocket() {
     }
   })
 
-  connect()
-
-  return { connected, connectionStatus, send, onMessage, disconnect }
+  return { connected, connectionStatus, send, onMessage, disconnect, connect }
 }

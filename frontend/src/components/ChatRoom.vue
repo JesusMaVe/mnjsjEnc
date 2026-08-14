@@ -83,13 +83,13 @@ import { PhUsers, PhSignOut, PhChatCircleDots, PhPaperPlaneRight } from '@phosph
 import MessageItem from './MessageItem.vue'
 import { useWebSocket } from '../composables/useWebSocket'
 
-const props = defineProps({ username: String, roomId: String })
+const props = defineProps({ username: String, roomId: String, token: String })
 const emit = defineEmits(['disconnect'])
 
 const messages = ref([])
 const newMessage = ref('')
 const messagesContainer = ref(null)
-const { connected, connectionStatus, send, onMessage, disconnect } = useWebSocket()
+const { connected, connectionStatus, send, onMessage, disconnect, connect } = useWebSocket()
 
 const BACKEND = 'http://127.0.0.1:8080'
 
@@ -175,7 +175,7 @@ function scrollToBottom() {
 
 onMounted(() => {
   loadHistory()
-  send({ type: 'join', username: props.username, roomId: props.roomId })
+  connect({ username: props.username, roomId: props.roomId, token: props.token })
 })
 </script>
 

@@ -8,7 +8,7 @@
       <p class="text-text-secondary text-sm mt-2">Conecta con otro usuario para enviar mensajes seguros</p>
     </div>
 
-    <form @submit.prevent="$emit('connect', username, roomId)" class="space-y-5">
+    <form @submit.prevent="handleConnect" class="space-y-5">
       <div>
         <label class="block text-sm font-medium text-text mb-2">Tu nombre</label>
         <input v-model="username" type="text" required placeholder="Ej: Juan" class="input-field" />
@@ -18,8 +18,9 @@
         <input v-model="roomId" type="text" required placeholder="Ej: sala-123" class="input-field" />
         <p class="text-xs text-text-muted mt-2">Comparte este ID con la otra persona</p>
       </div>
-      <button type="submit" :disabled="!username || !roomId" class="btn-primary w-full">
-        Conectar
+      <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+      <button type="submit" :disabled="!username || !roomId || loading" class="btn-primary w-full">
+        {{ loading ? 'Conectando...' : 'Conectar' }}
       </button>
     </form>
   </div>
@@ -29,8 +30,28 @@
 import { ref } from 'vue'
 import { PhLockKey } from '@phosphor-icons/vue'
 
-defineEmits(['connect'])
+const emit = defineEmits(['connect'])
 
 const username = ref('')
 const roomId = ref('')
+const loading = ref(false)
+const error = ref('')
+
+const BACKEND = 'http://127.0.0.1:8080'
+
+async function handleConnect() {
+  if (!username.value || !roomId.value) return
+  loading.value = true
+  error.value = ''
+  try {
+    const resp = await fetch(`${BACKEND}/token?room=${encodeURIComponent(roomId.value)}`)
+    if (!resp.ok) throw new Error('Failed to get room token')
+    const data = await resp.json()
+    emit('connect', username.value, roomId.value, data.token)
+  } catch (e) {
+    error.value = 'No se pudo conectar al servidor'
+  } finally {
+    loading.value = false
+  }
+}
 </script>

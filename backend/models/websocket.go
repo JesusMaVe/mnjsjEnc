@@ -8,4 +8,5 @@ type WebSocketMessage struct {
 	Content   string `json:"content,omitempty"`
 	MessageID string `json:"messageId,omitempty"`
 	Error     string `json:"error,omitempty"`
+	Token     string `json:"token,omitempty"`
 }
