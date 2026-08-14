@@ -9,13 +9,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"securemessage/middleware"
 	"securemessage/models"
 	"securemessage/repository"
 	"securemessage/services"
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		return origin == "http://localhost:3000" || origin == "http://127.0.0.1:3000"
+	},
 }
 
 type Client struct {
@@ -106,6 +110,7 @@ func (h *WebSocketHandler) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 		log.Printf("Upgrade error: %v", err)
 		return
 	}
+	conn.SetReadLimit(64 * 1024) // 64KB max WS message
 	c := &Client{Conn: conn, Send: make(chan []byte, 256)}
 	go c.writePump()
 	go c.readPump(h)
@@ -153,6 +158,15 @@ func (h *WebSocketHandler) handleMessage(c *Client, msg *models.WebSocketMessage
 }
 
 func (h *WebSocketHandler) handleJoin(c *Client, msg *models.WebSocketMessage) {
+	if err := middleware.ValidateUsername(msg.Username); err != nil {
+		h.sendError(c, "Invalid username")
+		return
+	}
+	if err := middleware.ValidateRoomName(msg.RoomID); err != nil {
+		h.sendError(c, "Invalid room name")
+		return
+	}
+
 	room, err := h.roomRepo.GetOrCreateRoom(msg.RoomID)
 	if err != nil {
 		h.sendError(c, "Error creating room")
@@ -177,6 +191,10 @@ func (h *WebSocketHandler) handleJoin(c *Client, msg *models.WebSocketMessage) {
 func (h *WebSocketHandler) handleMessageContent(c *Client, msg *models.WebSocketMessage) {
 	if c.RoomID == "" {
 		h.sendError(c, "Must join a room first")
+		return
+	}
+	if len(msg.Content) == 0 || len(msg.Content) > 1<<20 { // 1MB max
+		h.sendError(c, "Message must be between 1 and 1MB")
 		return
 	}
 

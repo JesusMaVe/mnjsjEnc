@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	svc      = crypto.New()
-	cluster  = availability.NewCluster(3, 0.3)
+	svc     = crypto.New()
+	cluster = availability.NewCluster(3, 0.3)
 )
 
 type Request struct {
@@ -30,6 +30,7 @@ func handleEncrypt(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB
 	var req Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
@@ -37,7 +38,8 @@ func handleEncrypt(w http.ResponseWriter, r *http.Request) {
 	}
 	ciphertext, err := svc.Encrypt(req.Message)
 	if err != nil {
-		respond(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		log.Printf("encrypt error: %v", err)
+		respond(w, http.StatusInternalServerError, map[string]string{"error": "encryption failed"})
 		return
 	}
 	respond(w, http.StatusOK, map[string]string{"ciphertext": ciphertext})
@@ -48,6 +50,7 @@ func handleDecrypt(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB
 	var req Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
@@ -66,6 +69,7 @@ func handleSign(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB
 	var req Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
@@ -73,7 +77,8 @@ func handleSign(w http.ResponseWriter, r *http.Request) {
 	}
 	signature, err := svc.Sign(req.Message)
 	if err != nil {
-		respond(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		log.Printf("sign error: %v", err)
+		respond(w, http.StatusInternalServerError, map[string]string{"error": "signing failed"})
 		return
 	}
 	respond(w, http.StatusOK, map[string]string{"message": req.Message, "signature": signature})
@@ -84,6 +89,7 @@ func handleVerify(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB
 	var req Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
@@ -91,7 +97,8 @@ func handleVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	valid, err := svc.Verify(req.Message, req.Signature)
 	if err != nil {
-		respond(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		log.Printf("verify error: %v", err)
+		respond(w, http.StatusInternalServerError, map[string]string{"error": "verification failed"})
 		return
 	}
 	respond(w, http.StatusOK, map[string]bool{"valid": valid})
@@ -103,7 +110,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 
 func cors(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {

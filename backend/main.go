@@ -8,13 +8,14 @@ import (
 	"securemessage/config"
 	"securemessage/database"
 	"securemessage/handlers"
+	"securemessage/middleware"
 	"securemessage/repository"
 	"securemessage/services"
 )
 
 func cors(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
@@ -61,7 +62,7 @@ func main() {
 		msgHandler.GetMessages(w, r, roomName)
 	}))
 
-	http.HandleFunc("/decrypt", cors(msgHandler.Decrypt))
+	http.HandleFunc("/decrypt", cors(middleware.MaxBytes(msgHandler.Decrypt, 1<<20)))
 
 	log.Printf("Server starting on port %s", cfg.ServerPort)
 	if err := http.ListenAndServe(":"+cfg.ServerPort, nil); err != nil {
