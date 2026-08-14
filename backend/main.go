@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"securemessage/config"
 	"securemessage/database"
@@ -48,9 +49,10 @@ func main() {
 
 	wsHandler := handlers.NewWebSocketHandler(roomRepo, messageRepo, ciaService, tokenStore)
 	msgHandler := handlers.NewMessageHandler(messageRepo, ciaService)
+	limiter := middleware.NewRateLimiter(100, time.Minute) // 100 req/min per IP
 
 	// Token endpoint — generates a room access token
-	http.HandleFunc("/token", cors(func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/token", cors(limiter.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		roomName := r.URL.Query().Get("room")
 		if roomName == "" {
 			http.Error(w, "room parameter required", http.StatusBadRequest)
@@ -67,7 +69,7 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"token": token, "room": roomName})
-	}))
+	})))
 
 	http.HandleFunc("/ws", wsHandler.HandleWebSocket)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -75,16 +77,16 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-	http.HandleFunc("/messages/", cors(func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/messages/", cors(limiter.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		roomName := strings.TrimPrefix(r.URL.Path, "/messages/")
 		if roomName == "" {
 			http.Error(w, "roomName required", http.StatusBadRequest)
 			return
 		}
 		msgHandler.GetMessages(w, r, roomName)
-	}))
+	})))
 
-	http.HandleFunc("/decrypt", cors(middleware.MaxBytes(msgHandler.Decrypt, 1<<20)))
+	http.HandleFunc("/decrypt", cors(limiter.Middleware(middleware.MaxBytes(msgHandler.Decrypt, 1<<20))))
 
 	log.Printf("Server starting on port %s", cfg.ServerPort)
 	if err := http.ListenAndServe(":"+cfg.ServerPort, nil); err != nil {

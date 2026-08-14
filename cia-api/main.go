@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"securemessage-cia/availability"
 	"securemessage-cia/crypto"
+	"sync"
+	"time"
 )
 
 var (
@@ -17,6 +19,54 @@ type Request struct {
 	Message    string `json:"message"`
 	Ciphertext string `json:"ciphertext"`
 	Signature  string `json:"signature"`
+}
+
+// Simple rate limiter
+type rateLimiter struct {
+	mu       sync.Mutex
+	requests map[string][]time.Time
+	limit    int
+	window   time.Duration
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{requests: make(map[string][]time.Time), limit: limit, window: window}
+}
+
+func (rl *rateLimiter) allow(key string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	start := now.Add(-rl.window)
+	reqs := rl.requests[key]
+	valid := reqs[:0]
+	for _, t := range reqs {
+		if t.After(start) {
+			valid = append(valid, t)
+		}
+	}
+	if len(valid) >= rl.limit {
+		rl.requests[key] = valid
+		return false
+	}
+	rl.requests[key] = append(valid, now)
+	return true
+}
+
+var limiter = newRateLimiter(50, time.Minute) // 50 req/min per IP
+
+func rateLimited(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := r.RemoteAddr
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			ip = fwd
+		}
+		if !limiter.allow(ip) {
+			respond(w, http.StatusTooManyRequests, map[string]string{"error": "rate limit exceeded"})
+			return
+		}
+		next(w, r)
+	}
 }
 
 func respond(w http.ResponseWriter, status int, v interface{}) {
@@ -122,10 +172,10 @@ func cors(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func main() {
-	http.HandleFunc("/confidentiality/encrypt", cors(handleEncrypt))
-	http.HandleFunc("/confidentiality/decrypt", cors(handleDecrypt))
-	http.HandleFunc("/integrity/sign", cors(handleSign))
-	http.HandleFunc("/integrity/verify", cors(handleVerify))
+	http.HandleFunc("/confidentiality/encrypt", cors(rateLimited(handleEncrypt)))
+	http.HandleFunc("/confidentiality/decrypt", cors(rateLimited(handleDecrypt)))
+	http.HandleFunc("/integrity/sign", cors(rateLimited(handleSign)))
+	http.HandleFunc("/integrity/verify", cors(rateLimited(handleVerify)))
 	http.HandleFunc("/availability/status", cors(cluster.HandleStatus))
 	http.HandleFunc("/availability/request", cors(cluster.HandleRequest))
 	http.HandleFunc("/", cors(handleRoot))

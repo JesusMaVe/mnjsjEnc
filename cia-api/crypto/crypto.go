@@ -21,15 +21,16 @@ const keysDir = "keys"
 const keysFile = "keys/crypto.json"
 
 type savedKeys struct {
-	FernetKey string `json:"fernet_key"`
-	RSAKey    string `json:"rsa_key"`
+	FernetKeys []string `json:"fernet_keys"` // keyring: current + previous
+	RSAKey     string   `json:"rsa_key"`
 }
 
 type CryptoService struct {
-	mu         sync.RWMutex
-	fernetKey  *fernet.Key
-	privateKey *rsa.PrivateKey
-	publicKey  *rsa.PublicKey
+	mu          sync.RWMutex
+	fernetKey   *fernet.Key   // current encryption key
+	fernetKeys  []*fernet.Key // keyring for decryption (current + previous)
+	privateKey  *rsa.PrivateKey
+	publicKey   *rsa.PublicKey
 }
 
 func New() *CryptoService {
@@ -55,6 +56,7 @@ func generateAndSaveKeys() *CryptoService {
 
 	svc := &CryptoService{
 		fernetKey:  &k,
+		fernetKeys: []*fernet.Key{&k},
 		privateKey: privateKey,
 		publicKey:  &privateKey.PublicKey,
 	}
@@ -77,13 +79,20 @@ func loadKeys() (*CryptoService, error) {
 		return nil, fmt.Errorf("corrupted keys file")
 	}
 
-	// Load Fernet key
-	decoded, err := base64.StdEncoding.DecodeString(saved.FernetKey)
-	if err != nil || len(decoded) != 32 {
-		return nil, fmt.Errorf("invalid fernet key")
+	// Load Fernet keyring
+	if len(saved.FernetKeys) == 0 {
+		return nil, fmt.Errorf("no fernet keys saved")
 	}
-	var k fernet.Key
-	copy(k[:], decoded)
+	var fernetKeys []*fernet.Key
+	for _, k64 := range saved.FernetKeys {
+		decoded, err := base64.StdEncoding.DecodeString(k64)
+		if err != nil || len(decoded) != 32 {
+			return nil, fmt.Errorf("invalid fernet key in keyring")
+		}
+		var k fernet.Key
+		copy(k[:], decoded)
+		fernetKeys = append(fernetKeys, &k)
+	}
 
 	// Load RSA private key
 	block, _ := pem.Decode([]byte(saved.RSAKey))
@@ -96,15 +105,19 @@ func loadKeys() (*CryptoService, error) {
 	}
 
 	return &CryptoService{
-		fernetKey:  &k,
+		fernetKey:  fernetKeys[0], // first key is current
+		fernetKeys: fernetKeys,
 		privateKey: privateKey,
 		publicKey:  &privateKey.PublicKey,
 	}, nil
 }
 
 func (s *CryptoService) saveKeys() error {
-	// Encode Fernet key
-	fernetB64 := base64.StdEncoding.EncodeToString(s.fernetKey[:])
+	// Encode Fernet keyring
+	var fernetB64s []string
+	for _, k := range s.fernetKeys {
+		fernetB64s = append(fernetB64s, base64.StdEncoding.EncodeToString(k[:]))
+	}
 
 	// Encode RSA private key as PEM
 	privBytes := x509.MarshalPKCS1PrivateKey(s.privateKey)
@@ -114,8 +127,8 @@ func (s *CryptoService) saveKeys() error {
 	})
 
 	saved := savedKeys{
-		FernetKey: fernetB64,
-		RSAKey:    string(privPEM),
+		FernetKeys: fernetB64s,
+		RSAKey:     string(privPEM),
 	}
 
 	data, err := json.MarshalIndent(saved, "", "  ")
@@ -128,45 +141,79 @@ func (s *CryptoService) saveKeys() error {
 
 // Encrypt cifra un mensaje usando Fernet (AES-CBC + HMAC)
 func (s *CryptoService) Encrypt(plaintext string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	tok, err := fernet.EncryptAndSign([]byte(plaintext), s.fernetKey)
 	if err != nil {
-		return "", fmt.Errorf("fernet encrypt failed: %w", err)
+		return "", fmt.Errorf("encryption failed")
 	}
 	return string(tok), nil
 }
 
-// Decrypt descifra un mensaje Fernet
+// Decrypt descifra un mensaje Fernet — tries all keys in keyring
 func (s *CryptoService) Decrypt(ciphertext string) (string, error) {
-	msg := fernet.VerifyAndDecrypt([]byte(ciphertext), 0, []*fernet.Key{s.fernetKey})
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	msg := fernet.VerifyAndDecrypt([]byte(ciphertext), 0, s.fernetKeys)
 	if msg == nil {
 		return "", fmt.Errorf("invalid or expired ciphertext")
 	}
 	return string(msg), nil
 }
 
-// Sign firma un mensaje usando RSA-SHA256
+// Sign firma un mensaje usando RSA-PSS (more secure than PKCS1v15)
 func (s *CryptoService) Sign(message string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	hash := sha256.Sum256([]byte(message))
-	signature, err := rsa.SignPKCS1v15(rand.Reader, s.privateKey, crypto.SHA256, hash[:])
+	opts := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthAuto}
+	signature, err := rsa.SignPSS(rand.Reader, s.privateKey, crypto.SHA256, hash[:], opts)
 	if err != nil {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(signature), nil
 }
 
-// Verify verifica la firma de un mensaje
+// Verify verifica la firma de un mensaje usando RSA-PSS
 func (s *CryptoService) Verify(message, signature string) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	sigBytes, err := base64.StdEncoding.DecodeString(signature)
 	if err != nil {
 		return false, err
 	}
 	hash := sha256.Sum256([]byte(message))
-	err = rsa.VerifyPKCS1v15(s.publicKey, crypto.SHA256, hash[:], sigBytes)
+	opts := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthAuto}
+	err = rsa.VerifyPSS(s.publicKey, crypto.SHA256, hash[:], sigBytes, opts)
 	return err == nil, nil
 }
 
-// ExportPublicKey exporta la clave pública en formato PEM
+// RotateKey genera una nueva llave Fernet y archiva la anterior
+func (s *CryptoService) RotateKey() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Archive current key
+	s.fernetKeys = append([]*fernet.Key{s.fernetKey}, s.fernetKeys...)
+	// Keep only 2 keys (current + 1 previous)
+	if len(s.fernetKeys) > 2 {
+		s.fernetKeys = s.fernetKeys[:2]
+	}
+
+	// Generate new key
+	var k fernet.Key
+	k.Generate()
+	s.fernetKey = &k
+	s.fernetKeys[0] = &k
+
+	log.Println("Fernet key rotated successfully")
+	return s.saveKeys()
+}
+
+// ExportPublicKey exporta la clave publica en formato PEM
 func (s *CryptoService) ExportPublicKey() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	pubASN1, _ := x509.MarshalPKIXPublicKey(s.publicKey)
 	pubPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PUBLIC KEY",
