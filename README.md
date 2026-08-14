@@ -22,12 +22,15 @@ Frontend (Vue 3)  ──WebSocket──▶  Backend (Go)  ──HTTP──▶  C
 
 ## Instalacion
 
-### 1. Configurar variables de entorno
+### 1. Clonar y configurar variables de entorno
 
 ```bash
+git clone https://github.com/JesusMaVe/mnjsjEnc.git
+cd mnjsjEnc
 cp .env.example .env
-# Editar .env con tus valores (especialmente POSTGRES_PASSWORD)
 ```
+
+Editar `.env` y cambiar `CHANGE_ME_STRONG_PASSWORD` por una contraseña real.
 
 ### 2. Base de datos (Docker)
 
@@ -35,14 +38,23 @@ cp .env.example .env
 docker compose up -d
 ```
 
+Verificar que este corriendo:
+```bash
+docker compose ps
+```
+
 ### 3. CIA API (Go)
 
 ```bash
 cd cia-api
+go mod tidy
 go run main.go
 ```
 
-La CIA API debe estar corriendo en `http://127.0.0.1:8000`
+La CIA API debe estar corriendo en `http://127.0.0.1:8000`. Verificar:
+```bash
+curl http://localhost:8000/
+```
 
 ### 4. Backend (Go)
 
@@ -52,6 +64,11 @@ go mod tidy
 go run main.go
 ```
 
+El Backend debe estar corriendo en `http://127.0.0.1:8080`. Verificar:
+```bash
+curl http://localhost:8080/health
+```
+
 ### 5. Frontend (Vue)
 
 ```bash
@@ -59,6 +76,8 @@ cd frontend
 npm install
 npm run dev
 ```
+
+Abrir `http://localhost:3000` en el navegador.
 
 ## Uso
 
