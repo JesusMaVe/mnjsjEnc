@@ -1,0 +1,95 @@
+# ============================
+# Go
+# ============================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+*.profmem
+
+# Go build output
+cia-api/cia-api
+backend/securemessage
+backend/backend
+cia-api/cia-api
+
+# Go coverage
+coverage.html
+coverage.out
+
+# Vendor (uncomment if vendoring)
+# vendor/
+
+# ============================
+# Node / Frontend
+# ============================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.log
+
+# ============================
+# Environment & Secrets
+# ============================
+.env
+.env.local
+.env.*.local
+
+# Crypto keys (NEVER commit)
+cia-api/keys/
+docker/postgres-certs/
+
+# ============================
+# Docker
+# ============================
+docker-compose.override.yml
+
+# ============================
+# IDE
+# ============================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ============================
+# OS
+# ============================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============================
+# Python (legacy)
+# ============================
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# ============================
+# Logs
+# ============================
+*.log
+logs/
+
+# ============================
+# Temporary files
+# ============================
+tmp/
+temp/
+*.tmp
+*.bak
