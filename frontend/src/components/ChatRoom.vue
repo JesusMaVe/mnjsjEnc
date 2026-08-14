@@ -157,6 +157,7 @@ onMessage((data) => {
 })
 
 function handleSend() {
+  console.log('[ChatRoom] handleSend:', newMessage.value, 'connected:', connected.value)
   if (!newMessage.value.trim() || !connected.value) return
   send({ type: 'message', content: newMessage.value.trim() })
   newMessage.value = ''
@@ -174,6 +175,8 @@ function scrollToBottom() {
 }
 
 onMounted(() => {
+  console.log('[ChatRoom] Mounted, loading history and connecting...')
+  console.log('[ChatRoom] Props:', { username: props.username, roomId: props.roomId, token: props.token })
   loadHistory()
   connect({ username: props.username, roomId: props.roomId, token: props.token })
 })

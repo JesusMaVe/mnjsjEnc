@@ -15,40 +15,51 @@ export function useWebSocket() {
     connectionStatus.value = 'connecting'
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    ws.value = new WebSocket(`${protocol}//${host}/ws`)
+    const url = `${protocol}//${host}/ws`
+    console.log('[WS] Connecting to:', url, 'with options:', options)
+
+    ws.value = new WebSocket(url)
 
     ws.value.onopen = () => {
+      console.log('[WS] Connected!')
       connected.value = true
       connectionStatus.value = 'connected'
       reconnectAttempts = 0
       // Send join with token
-      send({
+      const joinMsg = {
         type: 'join',
         username: connectOptions.username,
         roomId: connectOptions.roomId,
         token: connectOptions.token
-      })
+      }
+      console.log('[WS] Sending join:', joinMsg)
+      ws.value.send(JSON.stringify(joinMsg))
       while (pendingMessages.length > 0) {
-        ws.value.send(JSON.stringify(pendingMessages.shift()))
+        const msg = pendingMessages.shift()
+        console.log('[WS] Sending pending:', msg)
+        ws.value.send(JSON.stringify(msg))
       }
     }
 
     ws.value.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
+        console.log('[WS] Received:', data)
         listeners.forEach(fn => fn(data))
       } catch (e) {
-        console.error('Parse error:', e)
+        console.error('[WS] Parse error:', e)
       }
     }
 
-    ws.value.onclose = () => {
+    ws.value.onclose = (event) => {
+      console.log('[WS] Disconnected:', event.code, event.reason)
       connected.value = false
       connectionStatus.value = 'disconnected'
       scheduleReconnect()
     }
 
-    ws.value.onerror = () => {
+    ws.value.onerror = (error) => {
+      console.error('[WS] Error:', error)
       connected.value = false
       connectionStatus.value = 'disconnected'
     }
@@ -68,9 +79,12 @@ export function useWebSocket() {
   }
 
   function send(data) {
+    console.log('[WS] send() called:', data, 'readyState:', ws.value?.readyState)
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      console.log('[WS] Sending directly')
       ws.value.send(JSON.stringify(data))
     } else {
+      console.log('[WS] Queuing (not connected)')
       pendingMessages.push(data)
     }
   }
