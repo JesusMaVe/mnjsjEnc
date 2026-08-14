@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+)
 
 type Config struct {
 	DBHost     string
@@ -13,13 +16,21 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5432"),
-		DBUser:     getEnv("DB_USER", "postgres"),
-		DBPassword: getEnv("DB_PASSWORD", "postgres"),
-		DBName:     getEnv("DB_NAME", "securemessage"),
+		DBHost:     getEnvOrFatal("DB_HOST"),
+		DBPort:     getEnvOrFatal("DB_PORT"),
+		DBUser:     getEnvOrFatal("DB_USER"),
+		DBPassword: getEnvOrFatal("DB_PASSWORD"),
+		DBName:     getEnvOrFatal("DB_NAME"),
 		ServerPort: getEnv("SERVER_PORT", "8080"),
 	}
+}
+
+func getEnvOrFatal(key string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	log.Fatalf("Required environment variable %s is not set. Copy .env.example to .env and fill in values.", key)
+	return ""
 }
 
 func getEnv(key, fallback string) string {
