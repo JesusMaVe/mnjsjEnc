@@ -8,6 +8,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql
+      - ./backend/migrations/002_remove_plaintext.sql:/docker-entrypoint-initdb.d/002_remove_plaintext.sql
       - ./docker/postgres-certs/server.crt:/var/lib/postgresql/server.crt:ro
       - ./docker/postgres-certs/server.key:/var/lib/postgresql/server.key:ro
     command: >
