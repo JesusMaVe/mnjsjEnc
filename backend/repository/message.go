@@ -21,8 +21,8 @@ func (r *MessageRepository) CreateMessage(msg *models.Message, integrity *models
 	defer tx.Rollback()
 
 	_, err = tx.Exec(
-		`INSERT INTO messages (id, room_id, sender_username, content_original, content_encrypted) VALUES ($1, $2, $3, $4, $5)`,
-		msg.ID, msg.RoomID, msg.SenderUsername, msg.ContentOriginal, msg.ContentEncrypted,
+		`INSERT INTO messages (id, room_id, sender_username, content_encrypted) VALUES ($1, $2, $3, $4)`,
+		msg.ID, msg.RoomID, msg.SenderUsername, msg.ContentEncrypted,
 	)
 	if err != nil {
 		return err
@@ -72,9 +72,9 @@ func (r *MessageRepository) GetMessageByID(messageID string) (*models.Message, *
 	var integrity models.MessageIntegrity
 
 	err := r.db.QueryRow(
-		`SELECT id, room_id, sender_username, content_original, content_encrypted FROM messages WHERE id = $1`,
+		`SELECT id, room_id, sender_username, content_encrypted FROM messages WHERE id = $1`,
 		messageID,
-	).Scan(&msg.ID, &msg.RoomID, &msg.SenderUsername, &msg.ContentOriginal, &msg.ContentEncrypted)
+	).Scan(&msg.ID, &msg.RoomID, &msg.SenderUsername, &msg.ContentEncrypted)
 	if err != nil {
 		return nil, nil, err
 	}

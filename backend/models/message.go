@@ -6,7 +6,6 @@ type Message struct {
 	ID               string    `json:"id"`
 	RoomID           string    `json:"roomId"`
 	SenderUsername   string    `json:"sender"`
-	ContentOriginal  string    `json:"contentOriginal"`
 	ContentEncrypted string    `json:"contentEncrypted"`
 	CreatedAt        time.Time `json:"createdAt"`
 }

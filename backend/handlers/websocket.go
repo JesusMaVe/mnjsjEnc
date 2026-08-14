@@ -210,17 +210,17 @@ func (h *WebSocketHandler) handleMessageContent(c *Client, msg *models.WebSocket
 		return
 	}
 
-	// 2. Firmar mensaje con CIA API
-	signature, err := h.ciaService.Sign(msg.Content)
+	// 2. Firmar el CIPHERTEXT (no el plaintext) con CIA API
+	signature, err := h.ciaService.Sign(ciphertext)
 	if err != nil {
 		h.sendError(c, "Error signing message")
 		return
 	}
 
-	// 3. Guardar en BD (original + cifrado + firma)
+	// 3. Guardar en BD (solo ciphertext + firma, sin plaintext)
 	messageID := uuid.New().String()
 	if err := h.messageRepo.CreateMessage(
-		&models.Message{ID: messageID, RoomID: c.RoomID, SenderUsername: c.Username, ContentOriginal: msg.Content, ContentEncrypted: ciphertext},
+		&models.Message{ID: messageID, RoomID: c.RoomID, SenderUsername: c.Username, ContentEncrypted: ciphertext},
 		&models.MessageIntegrity{MessageID: messageID, Signature: signature, Status: "no_verificado"},
 	); err != nil {
 		h.sendError(c, "Error saving")
@@ -233,7 +233,7 @@ func (h *WebSocketHandler) handleMessageContent(c *Client, msg *models.WebSocket
 	})
 }
 
-// handleValidate: verifica la firma usando la CIA API, re-firma si las claves cambiaron
+// handleValidate: verifica la firma contra el ciphertext usando la CIA API
 func (h *WebSocketHandler) handleValidate(c *Client, msg *models.WebSocketMessage) {
 	message, integrity, err := h.messageRepo.GetMessageByID(msg.MessageID)
 	if err != nil {
@@ -246,11 +246,11 @@ func (h *WebSocketHandler) handleValidate(c *Client, msg *models.WebSocketMessag
 		return
 	}
 
-	// Verificar firma con CIA API
-	valid, err := h.ciaService.Verify(message.ContentOriginal, integrity.Signature)
+	// Verificar firma contra ciphertext
+	valid, err := h.ciaService.Verify(message.ContentEncrypted, integrity.Signature)
 	if err != nil || !valid {
 		// Re-firmar con claves actuales y reintentar
-		newSignature, signErr := h.ciaService.Sign(message.ContentOriginal)
+		newSignature, signErr := h.ciaService.Sign(message.ContentEncrypted)
 		if signErr != nil {
 			h.sendError(c, "Re-signing failed")
 			return
@@ -261,8 +261,8 @@ func (h *WebSocketHandler) handleValidate(c *Client, msg *models.WebSocketMessag
 			return
 		}
 
-		// Reintentar verificación con la nueva firma
-		valid, err = h.ciaService.Verify(message.ContentOriginal, newSignature)
+		// Reintentar verificacion con la nueva firma
+		valid, err = h.ciaService.Verify(message.ContentEncrypted, newSignature)
 		if err != nil || !valid {
 			h.sendError(c, "Invalid signature after re-signing")
 			return
