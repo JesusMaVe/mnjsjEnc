@@ -2,8 +2,6 @@
 
 Sistema de mensajeria con integridad criptografica usando el triangulo CIA (Confidentiality, Integrity, Availability).
 
-> **Proyecto academico/demo** — No usar en produccion sin las mejoras de seguridad documentadas en `docs/superpowers/plans/2026-08-13-security-remediation.md`.
-
 ## Arquitectura
 
 ```
@@ -112,8 +110,6 @@ Implementada en 15 issues cerradas:
 - **Graceful shutdown** — Conexiones WebSocket se cierran limpiamente
 - **SSL configurable** — `DB_SSLMODE` para conexiones seguras a PostgreSQL
 - **Keyring con rotacion** — Fernet mantiene llave actual + anterior
-
-Ver plan completo: `docs/superpowers/plans/2026-08-13-security-remediation.md`
 
 ## Estructura del Proyecto
 
